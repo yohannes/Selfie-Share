@@ -7,12 +7,20 @@
 //
 
 import UIKit
+import MultipeerConnectivity
 
-class ViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+class ViewController: UIViewController, UICollectionViewDataSource, UICollectionViewDelegate, UIImagePickerControllerDelegate, UINavigationControllerDelegate, MCSessionDelegate, MCBrowserViewControllerDelegate {
     
     // MARK: - Stored Properties
     
     var images = [UIImage]()
+    
+    // manager class that handles all multipeer connnectivity
+    var peerID: MCPeerID!
+    // identifies each user uniquely in a session
+    var mcSession: MCSession!
+    // Used to create a session and thus telling others that it exists and handling invitations
+    var mcAdvertiserAssistant: MCAdvertiserAssistant!
     
     // MARK: - IBOutlet Properties
     
@@ -25,6 +33,11 @@ class ViewController: UIViewController, UICollectionViewDataSource, UICollection
         
         self.title = "Selfie Share"
         self.navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .Camera, target: self, action: "importPicture")
+        self.navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .Add, target: self, action: "showConnectionPrompt")
+        
+        self.peerID = MCPeerID(displayName: UIDevice.currentDevice().name)
+        self.mcSession = MCSession(peer: peerID, securityIdentity: nil, encryptionPreference: .Required)
+        self.mcSession.delegate = self
     }
 
     override func didReceiveMemoryWarning() {
@@ -76,6 +89,29 @@ class ViewController: UIViewController, UICollectionViewDataSource, UICollection
         imagePickerController.allowsEditing = true
         imagePickerController.delegate = self
         self.presentViewController(imagePickerController, animated: true, completion: nil)
+    }
+    
+    func showConnectionPrompt() {
+        let alertController = UIAlertController(title: "Connect to peers", message: nil, preferredStyle: .ActionSheet)
+        let alertActionToHost = UIAlertAction(title: "Host a session", style: .Default, handler: self.startHosting)
+        let alertActionToJoin = UIAlertAction(title: "Join a session", style: .Default, handler: self.joinSession)
+        let alertActionToCancel = UIAlertAction(title: "Cancel", style: .Cancel, handler: nil)
+        alertController.addAction(alertActionToHost)
+        alertController.addAction(alertActionToJoin)
+        alertController.addAction(alertActionToCancel)
+        self.presentViewController(alertController, animated: true, completion: nil)
+    }
+    
+    func startHosting(alertAction: UIAlertAction) {
+        self.mcAdvertiserAssistant = MCAdvertiserAssistant(serviceType: "selfie-share", discoveryInfo: nil, session: self.mcSession)
+        self.mcAdvertiserAssistant.start()
+    }
+    
+    func joinSession(alertAction: UIAlertAction) {
+        // used to look for sessions, showing users who is nearby and letting them join
+        let mcBrowser = MCBrowserViewController(serviceType: "selfie-share", session: self.mcSession)
+        mcBrowser.delegate = self
+        self.presentViewController(mcBrowser, animated: true, completion: nil)
     }
 }
 
